@@ -227,3 +227,24 @@ prp(treeplot_model,
     box.col=c("red", "lightblue", "yellow", "pink", "palegreen3")[treeplot_model$frame$yval])
 ```
 
+
+## Creating files for Prediction Assignment Submission
+
+```{r eval=FALSE}
+answers <- as.vector(predict_test) 
+
+pml_write_files = function(x){
+        n = length(x)
+        for(i in 1:n){
+                filename = paste0("problem_id_",i,".txt")
+                write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+        }
+}
+
+
+pml_write_files(answers)
+```
+
+END
+
+

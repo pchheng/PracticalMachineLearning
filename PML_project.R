@@ -137,8 +137,8 @@ OOSE_2 <- 1- as.numeric(confusionMatrix(testing_data$classe, rf_predict)$overall
 OOSE_2 #  0.01060359
 
 
-# rfmodFit2 <- randomForest(formula = classe ~ ., data = training_data) 
-# rfmodFit2
+rfmodFit2 <- randomForest(formula = classe ~ ., data = training_data) 
+rfmodFit2 # OOB = 0.46%
 
 
 # Predicting on the orginal test dataset
@@ -177,6 +177,9 @@ names(pml_testing_final) # 52 var
 predict_test <- predict(rfmodFit, pml_testing_final)
 predict_test
 
+predict_test[1:20]
+
+
 
 # Visualization
 ###############
@@ -206,218 +209,26 @@ prp(treeplot_model,
 
 
 
+# Creating files for Prediction Assignment Submission
+######################################################
 
+answers <- as.vector(predict_test) 
 
+pml_write_files = function(x){
+        n = length(x)
+        for(i in 1:n){
+                filename = paste0("problem_id_",i,".txt")
+                write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+        }
+}
 
-###################
 
 
+pml_write_files(answers)
 
 
 
-# You should create a report describing how you built your model, 
-
-
-
-# how you used cross validation, 
-
-
-
-# what you think the expected out of sample error is, and 
-
-
-
-# why you made the choices you did. 
-
-
-
-# You will also use your prediction model to predict 20 different test cases
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-library(AppliedPredictiveModeling)
-library(caret)
-data(AlzheimerDisease)
-#summary(AlzheimerDisease)
-
-adData = data.frame(diagnosis,predictors)
-trainIndex = createDataPartition(diagnosis, p = 0.50,list=FALSE)
-training = adData[trainIndex,]
-testing = adData[-trainIndex,]
-
-
-# Q2
-# Load the cement data using the commands:
-
-library(AppliedPredictiveModeling)
-data(concrete)
-
-library(caret)
-set.seed(1000)
-inTrain = createDataPartition(mixtures$CompressiveStrength, p = 3/4)[[1]]
-training = mixtures[ inTrain,]
-testing = mixtures[-inTrain,]
-
-# Make a histogram and confirm the SuperPlasticizer variable is skewed
-hist(training$Superplasticizer, main="", xlab="Super Plasticizer")
-
-### The log transform produces negative values which can not be used by some classifiers.
-
-
-# Q3
-# Load the Alzheimer's disease data using the commands:
-
-library(caret)
-library(AppliedPredictiveModeling)
-set.seed(3433)
-data(AlzheimerDisease)
-adData = data.frame(diagnosis,predictors)
-inTrain = createDataPartition(adData$diagnosis, p = 3/4)[[1]]
-training = adData[ inTrain,]
-testing = adData[-inTrain,]
-
-# Find all the predictor variables in the training set that begin with IL. 
-str(training) # thre are 251 obs and 131 var
-
-ILpv <- grep("^IL", colnames(training), value=TRUE)
-head(ILpv)
-
-# Perform principal components on these variables with the preProcess() function from the caret package. 
-# Calculate the number of principal components needed to capture 80% of the variance
-
-preProc <- preProcess(training[, ILpv], method = "pca", thresh = 0.8)
-preProc$rotation # 7 pc
-
-# Q4:
-# Create a training data set consisting of only the predictors with variable names beginning with IL and the diagnosis. 
-# Build two predictive models, one using the predictors as they are and one using PCA with principal components 
-# explaining 80% of the variance in the predictors. Use method="glm" in the train function. 
-# What is the accuracy of each method in the test set? Which is more accurate?
-
-# Load the Alzheimer's disease data using the commands:
-library(caret)
-library(AppliedPredictiveModeling)
-
-set.seed(3433)
-data(AlzheimerDisease)
-adData = data.frame(diagnosis,predictors)
-inTrain = createDataPartition(adData$diagnosis, p = 3/4)[[1]]
-training = adData[ inTrain,]
-testing = adData[-inTrain,]
-
-
-set.seed(3433)
-# grep predictors starting with IL
-ILpv <- grep("^IL", colnames(training), value=TRUE)
-
-# Subset predictors starting with IL
-predictors_IL <- predictors[, ILpv]
-
-# Create a training data set consisting of only IL predictors and diagnosis
-ad_Data = data.frame(predictors_IL,diagnosis)
-inTrain = createDataPartition(ad_Data$diagnosis, p = 3/4)[[1]]
-training = ad_Data[ inTrain,]
-testing = ad_Data[-inTrain,]
-
-# train data using the predictors as they are 
-modelFit_Non_PCA <- train(diagnosis ~ .,method="glm",data=training)
-
-predictions_Non_PCA <- predict(modelFit_Non_PCA, newdata = testing)
-
-CM_Non_PCA <- confusionMatrix(predictions_Non_PCA,testing$diagnosis)
-print(CM_Non_PCA) # Accuracy : 0.6463  
-
-# train data using one using PCA with principal components 
-# explaining 80% of the variance
-preProc <- preProcess(training, method = "pca", thresh = 0.8)
-trainPCA <- predict(preProc, training)
-modelFit_PCA <- train(diagnosis ~ .,method="glm",data=trainPCA)
-
-testPCA <- predict(preProc,testing)
-CM_PCA <- confusionMatrix(testing$diagnosis,predict(modelFit_PCA,testPCA))
-print(CM_PCA) # Accuracy : 0.7195
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-library(ISLR); library(ggplot2); library(caret);
-data(Wage); Wage <- subset(Wage,select=-c(logwage))
-summary(Wage)
-
-# Get training/test sets
-
-inTrain <- createDataPartition(y=Wage$wage,
-                               p=0.7, list=FALSE)
-training <- Wage[inTrain,]; testing <- Wage[-inTrain,]
-dim(training); dim(testing)
-
-# Feature plot
-
-featurePlot(x=training[,c("age","education","jobclass")],
-            y = training$wage,
-            plot="pairs")
-
-# Plot age versus wage
-qplot(age,wage,data=training)
-
-# Plot age versus wage colour by jobclass
-qplot(age,wage,colour=jobclass,data=training)
-
-
-# Plot age versus wage colour by education
-qplot(age,wage,colour=education,data=training)
-
-
-# Fit a linear model
-modFit<- train(wage ~ age + jobclass + education,
-               method = "lm",data=training)
-finMod <- modFit$finalModel
-print(modFit)
-
-# Diagnostics
-plot(finMod,1,pch=19,cex=0.5,col="#00000010")
-
-# Color by variables not used in the model
-qplot(finMod$fitted,finMod$residuals,colour=race,data=training)
-
-# Plot by index
-plot(finMod$residuals,pch=19)
-
-
-# Predicted versus truth in test set
-pred <- predict(modFit, testing)
-qplot(wage,pred,colour=year,data=testing)
-
-# If you want to use all covariates
-modFitAll<- train(wage ~ .,data=training,method="lm")
-pred <- predict(modFitAll, testing)
-qplot(wage,pred,data=testing)
-
-
-
-
-
+#########END###########
 
 
 
