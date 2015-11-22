@@ -1,0 +1,229 @@
+## Practical Machine Learning Project
+
+# Predicting the manner of exercise performance
+
+### Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+### Goal
+The goal of this project is to predict the manner of how in which they did the exercise.
+
+
+### Data Preprocessing 
+#### 1. Download dataset provided for this project analysis into the local machine:
+  + The training data for this project are available here: 
+        <https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv>
+  + The test data are available here: 
+        <https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv>
+
+#### 2. Read and clean data as needed
+
+```{r}
+setwd("\\Users\\pxc233\\Documents\\Phalkun\\Classes\\Coursera\\Practical Machine Learning\\Project\\Data")
+
+pml_training <- read.csv("pml-training.csv")
+pml_testing <- read.csv("pml-testing.csv")
+```
+Checking train dataset:
+```{r}
+dim(pml_training) 
+table(pml_training$classe)
+```
+To see summary of training dataset:
+```{r eval=FALSE}       
+summary(pml_training) 
+```
+Checking test dataset:
+```{r}
+dim(pml_testing) 
+```
+To see summary of test dataset:
+```{r eval=FALSE}       
+summary(pml_testing) 
+```
+
+There are total 19622 observations (obs) and 160 variables in the train dataset and 20 observations and 160 variables in the test dataset. Of 19622 obs in the train dataset are classified in to 5 different classifications ('classe' variable) including class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes:
+  + Class A (5580 obs): exactly according to the specification, 
+  + Class B (3797 obs): throwing the elbows to the front 
+  + Class C (3422 obs): lifting the dumbbell only halfway 
+  + Class D (3216 obs): lowering the dumbbell only halfway
+  + Class E (3607 obs): throwing the hips to the front
+
+We found that only 406 are complete cases and that some variables have missing values (NA) in the training dataset. Therefore, we cleaned and removed some variables with NA and or some variables that are not important to 'classe' variable such as factor variables (X, -timestamp, _window). Finally, there are only 53 variables remaining in the training dataset. We also cleaned and removed some observations with NA, if any, and factor variables (X, -timestamp, _window) from the test dataset and only 53 variables remaining.  
+
+Checking variables with complete obs in the training dataset:
+
+```{r}
+train_comp_obs <- sum(complete.cases(pml_training))
+train_comp_obs # 406 obs
+```
+
+Checking variables with complete obs in the test dataset:
+```{r}
+test_comp_obs <- sum(complete.cases(pml_testing))
+test_comp_obs # 0 obs
+```
+
+Removing var or colunm with NA from training dataset:
+```{r}
+pml_training <- pml_training[, colSums(is.na(pml_training)) == 0]
+dim(pml_training) # 19,622 obs. of  93 variables
+```
+names(pml_training)
+summary(pml_training) # No NA
+
+Removing var that are not important from training dataset:
+```{r}
+train_remove <- grepl("^X|timestamp|window", names(pml_training))
+summary(train_remove) # 6 more var removed
+pml_training <- pml_training[, !train_remove]
+dim(pml_training) # 19622 obs. of  87 variables
+```
+
+Subset only numeric var in the training dataset:
+```{r}
+pml_training_final <- pml_training[, sapply(pml_training, is.numeric)]
+dim(pml_training_final) # 19622 obs. of  52 variables:
+```
+Since the required 'classe' var was removed, we add it back to the final training daset
+```{r}
+pml_training_final$classe <- pml_training$classe
+dim(pml_training_final) # 19622 obs. of  53 variables
+```
+
+#### 3. Slicing the data
+For the purpose of cross validation (CV), we sub-split the training set (final training dataset) into training (70%) and test or validation set (30%). As a result, we got 14,718 obs in the training set and 4,904 obs in the test set. 
+
+```{r}
+set.seed(32343) # to get the same resampled numbers generated
+library(caret)
+```
+Create training set with with 75% of data and validation set
+```{r}
+inTrain <- createDataPartition(pml_training_final$classe, p=0.75, list=FALSE)
+training_data <- pml_training_final[inTrain,]
+testing_data <- pml_training_final[-inTrain,]
+```
+dimension of original training dataset and validation set
+```{r}
+rbind("original dataset" = dim(training_data),"training set" = dim(testing_data))
+```
+
+### Data Modeling 
+
+We used the test set within training set to do CV, meaning we estimated accuracy of the validation set within the training set and then applied final model in the original test set. Doing so, we would get un-bias measurement of out of sample accuracy. To be more precise in building models, we used 'trainControl' arg of train function of package **caret** and built models on the training set and then assessed performance of the trained model on the validation set. 
+
+#### Out-of-sample error (OOSE): 
+We calculated OOSE rates using the confusion matrix method of the **Caret** package for the classification model and validation set. We expected that OOSE rates for the validation set should be similar or greater than the calculate out-of-bag (OOB) for the training set. We found that the estimated accuracy is 98.94%, the estimated out-of-sample error (OOSE) is 1.06% and OOB is 0.46%.
+
+```{r}
+library(caret)
+library(randomForest)
+
+# cvControl <- trainControl(## 5-fold CV
+#                           method="repeatedcv", 
+#                           number = 5, 
+#                           ## repeated 10 times
+#                           repeats = 3)
+
+cvControl <- trainControl(method="cv", number=5) 
+rfmodFit <- train(classe ~ .,data=training_data, method="rf", trControl=cvControl, ntree=250)
+rfmodFit
+```
+
+Use the fitted model on the test set (testSA)
+```{r}
+rf_predict <- predict(rfmodFit, testing_data)
+```
+Use function confusionMatrix to get summary of the results of the model
+```{r}
+CM_rf <- confusionMatrix(testing_data$classe, rf_predict)
+CM_rf 
+```
+To calculate Accuracy use postResample function
+```{r}
+Accuracy <- postResample(rf_predict, testing_data$classe)
+Accuracy # Accuracy=0.9893964
+```
+To calculate estimated out-of-sample error (OOSE)
+```{r}
+OOSE <- 1 - Accuracy[1]
+OOSE # 0.01060359 
+
+# or another way       
+OOSE_2 <- 1- as.numeric(confusionMatrix(testing_data$classe, rf_predict)$overall[1])
+OOSE_2 #  0.01060359
+```
+To calculate OOB:
+```{r}
+rfmodFit2 <- randomForest(formula = classe ~ ., data = training_data) 
+rfmodFit2 # OOB = 0.46%
+```
+
+
+### Prediction for the test dataset 
+Finally, we used the fitted model to predict for the original test dataset (see Table 1: Results of the prediction).
+
+Removing var or colunm with NA from test dataset:
+```{r}
+pml_testing <- pml_testing[, colSums(is.na(pml_testing)) == 0]
+dim(pml_testing) # 20 obs. of  60 variables
+```
+Removing var are not important from test dataset:
+```{r}
+test_remove <- grepl("^X|timestamp|window", names(pml_testing))
+summary(test_remove) # 6 more var removed
+
+pml_testing <- pml_testing[, !test_remove]
+dim(pml_testing) # 20 obs. of  54 variables
+
+pml_testing_final <- pml_testing[, sapply(pml_testing, is.numeric)]
+dim(pml_testing_final) # 20 obs and 53 variables
+```
+To see all var names:
+```{r eval=FALSE}
+names(pml_testing_final) # 53 variables
+```
+
+So there are the same 53 var or features while only 52 in traning dataset
+
+Remove 'problem_id' var from the test dataset
+```{r}
+pml_testing_final <- pml_testing_final[, -53]
+dim(pml_testing_final) # 52 var
+```
+Now there are the same 52 var or features as in traning dataset
+
+Using the fitted model to Predict for the orginal test dataset
+```{r}
+predict_test <- predict(rfmodFit, pml_testing_final)
+predict_test
+```
+
+
+## Visualization
+
+#### Table 1: Prediction Results for validation data set
+
+Tabulate results
+```{r}
+table(rf_predict,testing_data$classe)
+```
+
+#### Figure 1: Decision tree plot
+
+Check overall correct results of prediction by the rf algorithm 
+```{r}
+testing_data$predRight <- rf_predict==testing_data$classe
+table(testing_data$predRight)
+```
+
+Decision tree plot
+```{r}
+library(rpart)
+library(rpart.plot)
+treeplot_model <- rpart(classe ~ ., data=training_data, method="class")
+prp(treeplot_model,
+    box.col=c("red", "lightblue", "yellow", "pink", "palegreen3")[treeplot_model$frame$yval])
+```
+
